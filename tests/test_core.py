@@ -160,6 +160,27 @@ def test_calibration_metrics_on_a_scripted_judge():
     assert 0.5 < rep.auc < 1.0
 
 
+def test_cli_gate_exit_codes(tmp_dir=None):
+    import json as _json
+    import tempfile
+    from agentproof.cli import main as cli
+    from agentproof.report import to_json
+    flips = itertools.cycle([True, False])
+    async def good(t):
+        return booking_transcript()
+    async def flaky(t):
+        return booking_transcript(book=next(flips))
+    d = tmp_dir or tempfile.mkdtemp()
+    for name, agent in (("good", good), ("flaky", flaky)):
+        data = to_json(run([task(id="reg", tier=Tier.REGRESSION)], agent, trials=2), meta={"variant": name})
+        with open(os.path.join(d, f"{name}.json"), "w") as f:
+            _json.dump(data, f)
+    assert cli(["gate", os.path.join(d, "good.json")]) == 0
+    assert cli(["gate", os.path.join(d, "flaky.json")]) == 1                        # regression floor
+    assert cli(["gate", os.path.join(d, "good.json"), "--baseline", os.path.join(d, "good.json")]) == 0
+    assert cli(["compare", os.path.join(d, "good.json"), os.path.join(d, "flaky.json")]) == 0
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

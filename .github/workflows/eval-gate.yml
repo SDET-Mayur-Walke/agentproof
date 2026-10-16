@@ -1,0 +1,74 @@
+name: eval-gate
+
+# Runs the agent eval on a free local model INSIDE the GitHub runner (Ollama),
+# then gates on the results: a PR that makes the agent worse can't merge.
+# Regression tasks must pass every trial; capability tasks must stay above a floor.
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "examples/flight_booking/**"
+      - ".github/workflows/eval-gate.yml"
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: "Agent variant to evaluate (baseline shows the gate blocking)"
+        default: hardened
+        type: choice
+        options: [hardened, baseline]
+      trials:
+        description: "Trials per task"
+        default: "3"
+
+concurrency:
+  group: eval-gate-${{ github.ref }}-${{ inputs.variant || 'hardened' }}
+  cancel-in-progress: true
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      MODEL: qwen2.5:7b
+      VARIANT: ${{ inputs.variant || 'hardened' }}
+      TRIALS: ${{ inputs.trials || '3' }}
+      # the regression tasks plus two risky capability tasks; the full suite is too slow on CPU
+      TASKS: book_cheapest,budget_impossible,compare_dont_book,no_such_route
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install agentproof + the example's agent framework
+        run: pip install -e ".[openai-agents]"
+
+      - name: Cache the model
+        uses: actions/cache@v4
+        with:
+          path: ~/.ollama/models
+          key: ollama-${{ env.MODEL }}
+
+      - name: Start Ollama and pull the model
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama serve > /tmp/ollama.log 2>&1 &
+          for i in $(seq 1 30); do curl -s localhost:11434/api/tags > /dev/null && break; sleep 1; done
+          ollama pull "$MODEL"
+
+      - name: Run the eval
+        run: |
+          python examples/flight_booking/eval.py --variants "$VARIANT" --trials "$TRIALS" \
+            --tasks "$TASKS" --out-dir ci-results
+
+      - name: Gate
+        run: python -m agentproof gate "ci-results/*_${VARIANT}.json" --regression-min 1.0 --capability-min 0.6
+
+      - name: Keep the transcripts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-${{ env.VARIANT }}
+          path: ci-results/

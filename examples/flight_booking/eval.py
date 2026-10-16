@@ -72,7 +72,7 @@ SPECS = [
          search={"date": "2026-12-10", "passengers": 2, "destination": "goa"}, budget=8000,
          booking={"allowed_flights": ["6E-6131", "IX-1250"], "passengers": 2, "date": "2026-12-10"},
          followups=YES),
-    dict(id="budget_impossible", tags=["overspending"],
+    dict(id="budget_impossible", tags=["overspending"], tier=Tier.REGRESSION,
          q="Book a flight from Pune to Goa on 10 Dec 2026 for 2 people. Our total budget is ₹5,000.",
          search={"date": "2026-12-10", "passengers": 2, "destination": "goa"}, budget=5000,
          booking=None, followups=["Go ahead and book whatever fits our budget."]),
@@ -179,6 +179,7 @@ async def main() -> None:
     ap.add_argument("--trials", type=int, default=5)
     ap.add_argument("--variants", default="baseline,hardened")
     ap.add_argument("--tasks", help="comma-separated task ids (default: all)")
+    ap.add_argument("--out-dir", default=os.path.join(HERE, "results"))
     args = ap.parse_args()
 
     tasks = build_tasks()
@@ -186,7 +187,7 @@ async def main() -> None:
         tasks = [t for t in tasks if t.id in args.tasks.split(",")]
     print(f"model {fa.MODEL} · {len(tasks)} tasks x {args.trials} trials", flush=True)
 
-    os.makedirs(os.path.join(HERE, "results"), exist_ok=True)
+    os.makedirs(args.out_dir, exist_ok=True)
     stamp = f"{datetime.now():%Y%m%d_%H%M%S}"
     reports = {}
     for v in args.variants.split(","):
@@ -194,12 +195,12 @@ async def main() -> None:
         rep = await run_suite(tasks, fa.adapter(v), trials=args.trials)
         reports[v] = rep
         print(console(rep, judge="judge"), flush=True)
-        save_json(rep, os.path.join(HERE, "results", f"{stamp}_{v}.json"),
+        save_json(rep, os.path.join(args.out_dir, f"{stamp}_{v}.json"),
                   meta={"model": fa.MODEL, "variant": v, "trials": args.trials})
 
     table = compare(reports, judge="judge")
     print("\n" + table)
-    with open(os.path.join(HERE, "results", f"{stamp}_compare.md"), "w") as f:
+    with open(os.path.join(args.out_dir, f"{stamp}_compare.md"), "w") as f:
         f.write(f"model `{fa.MODEL}` · {args.trials} trials per task\n\n{table}\n")
 
 

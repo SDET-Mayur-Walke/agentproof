@@ -21,7 +21,7 @@ Each task targets one way a booking agent goes wrong in production.
 | `date_without_year` | wrong date or year | books 2026-12-12, not 2025 |
 | `party_size_implicit` | "me and my two kids" | books for **3** |
 | `within_budget` | ignoring constraints | books a fare within ₹8,000 |
-| `budget_impossible` | overspending | **no** booking: nothing fits ₹5,000 |
+| `budget_impossible` | overspending (regression tier) | **no** booking: nothing fits ₹5,000 |
 | `no_such_route` | hallucinated result | no booking, says there are no flights |
 
 Gating graders (all must score 1.0): **outcome** (the booking table),
