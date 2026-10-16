@@ -8,8 +8,8 @@ the right order, with the user's facts? Did the world end up in the right
 state? Does every number in its reply trace to something it actually saw?
 And does it do that *every* time, not just once?
 
-> Status: **v0.2, work in progress.** The core harness, graders and a first
-> full example are done and tested; judge calibration, adapters, the CI gate
+> Status: **v0.3, work in progress.** The core harness, graders, a full
+> example and judge calibration are done and tested; adapters, the CI gate
 > and tracing are next (see the roadmap).
 
 ## First result: a flight-booking agent
@@ -28,6 +28,32 @@ Every one of these failures read like a good answer: "Your flight has been
 booked successfully" (₹6,900 on a ₹5,000 budget), or a polite offer to book
 a made-up flight. Only the checks on what the agent **did** and **saw**
 caught them; the LLM judge scored them about the same as correct answers.
+
+## Can you trust your LLM judge? Measure it
+
+`agentproof.calibration` grades a judge like a classifier: failures caught,
+false alarms, Cohen's kappa, AUC, and consistency across repeats. Real failures
+are rare, so it also does **mutation testing for judges**: inject a known
+defect into a good transcript, confirm it with the code graders, and see
+whether the judge notices.
+
+On the flight-booking agent (104 labelled items, qwen2.5:7b as judge):
+
+| | judge sees the reply only | judge also sees the tool calls + a checklist |
+|---|---|---|
+| Cohen's kappa (0 = chance) | 0.08 | **0.85** |
+| AUC (0.5 = coin flip) | 0.63 | **0.96** |
+| Good answers wrongly failed | 55% | 3% |
+| Invented flights caught | 4/8 | 5/8 |
+
+Same model, very different judge. But even the good one let 3 of 8 invented
+flights through, so code checks still gate, and the judge advises.
+
+```python
+from agentproof.calibration import LabelledItem, calibrate, mutate
+report = await calibrate(labelled_items, my_judge, repeats=3)
+print(report.summary())          # ends with: VERDICT: fit to gate / NOT fit to gate: ...
+```
 
 ## The idea in one table
 
@@ -70,7 +96,7 @@ with any framework.
 ## Run the tests
 
 ```bash
-python tests/test_core.py      # no dependencies, no LLM (9 tests)
+python tests/test_core.py      # no dependencies, no LLM (10 tests)
 ```
 
 ## Roadmap
@@ -80,7 +106,7 @@ python tests/test_core.py      # no dependencies, no LLM (9 tests)
 - [x] Reports: console dot grid, JSON, Markdown, regression gate
 - [x] Example: flight-booking agent (baseline vs hardened), runs free on Ollama
 - [x] Variant comparison table + judge passed/failed split; CI runs the unit tests
-- [ ] Judge calibration: agreement of an LLM judge with labelled trials
+- [x] Judge calibration: recall, false alarms, kappa, AUC, consistency; mutation testing for judges
 - [ ] Adapters: OpenAI Agents SDK, LangGraph, CrewAI, Google ADK
 - [ ] CLI + GitHub Action: block a PR when a regression task drops
 - [ ] Langfuse tracing: every trial linked to its trace

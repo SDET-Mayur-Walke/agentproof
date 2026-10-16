@@ -127,6 +127,39 @@ def test_compare_table_and_judge_split():
     assert "●● 100%" in table and "○○ 0%" in table and "0.90 / –" in table
 
 
+def test_calibration_metrics_on_a_scripted_judge():
+    from agentproof.calibration import LabelledItem, calibrate, mutate
+    t0 = task()
+    good = [LabelledItem(t0, booking_transcript(), True) for _ in range(4)]
+
+    def invent_price(task, t):
+        t.final_output = t.final_output.replace("5400", "4999")
+        return t
+    bad = [mutate(g, "invented_price", invent_price) for g in good[:2]]
+    bad.append(mutate(good[0], "no_op", lambda task, t: None))      # mutation doesn't apply
+    bad = [b for b in bad if b]
+    assert len(bad) == 2 and all(not b.label and "4999" in b.transcript.final_output for b in bad)
+    assert "5400" in good[0].transcript.final_output                # original untouched
+
+    # judge: likes everything except the FIRST invented-price item
+    seen = {"n": 0}
+    async def judge_fn(rubric, task, t):
+        if "4999" in t.final_output and seen["n"] < 2:
+            seen["n"] += 1
+            return 0.1, ""
+        return 0.9, ""
+    from agentproof.graders import llm_judge
+    rep = asyncio.run(calibrate(good + bad, llm_judge("j", "?", judge_fn), repeats=2))
+    assert rep.n_pass == 4 and rep.n_fail == 2
+    assert rep.fail_recall == 0.5 and rep.false_alarm_rate == 0.0
+    assert rep.balanced_accuracy == 0.75
+    assert rep.consistency == 1.0
+    assert rep.by_source()["invented_price"] == (1, 2)
+    ok, why = rep.verdict()
+    assert not ok and any("recall" in w for w in why)
+    assert 0.5 < rep.auc < 1.0
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

@@ -127,7 +127,7 @@ JudgeFn = Callable[[str, Task, Transcript], Awaitable[tuple[float, str]]]
 def llm_judge(name: str, rubric: str, judge: JudgeFn, gating: bool = False) -> Grader:
     """judge(rubric, task, transcript) -> (score, reason). Kept as a plain
     callable so the core has no LLM dependency (see agentproof.judges).
-    Non-gating until calibrated: use calibration.agreement() first."""
+    Non-gating until calibrated: measure it with calibration.calibrate() first."""
     async def run(task, t):
         return await judge(rubric, task, t)
     return Grader(name, run, gating)

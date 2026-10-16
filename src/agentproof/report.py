@@ -7,7 +7,7 @@ import json
 from dataclasses import asdict
 from datetime import datetime, timezone
 
-from .core import SuiteReport, Tier
+from .core import SuiteReport, Tier, ToolCall, Transcript
 
 
 def console(report: SuiteReport, judge: str | None = None) -> str:
@@ -50,6 +50,7 @@ def to_json(report: SuiteReport, meta: dict | None = None) -> dict:
                 "final_output": t.transcript.final_output,
                 "tool_calls": [asdict(c) for c in t.transcript.tool_calls],
                 "outcome": t.transcript.outcome, "error": t.transcript.error,
+                "turns": t.transcript.turns,
                 "usage": t.transcript.usage,
             } for t in r.trials],
         } for r in report.tasks],
@@ -59,6 +60,22 @@ def to_json(report: SuiteReport, meta: dict | None = None) -> dict:
 def save_json(report: SuiteReport, path: str, meta: dict | None = None) -> None:
     with open(path, "w") as f:
         json.dump(to_json(report, meta), f, indent=2, default=str)
+
+
+def load_trials(path: str) -> list[tuple[str, Transcript, bool]]:
+    """Read a saved run back as (task_id, Transcript, passed) — e.g. to
+    re-grade it, or to use code-graded trials as labels for calibration."""
+    with open(path) as f:
+        data = json.load(f)
+    out = []
+    for task in data["tasks"]:
+        for t in task["trials"]:
+            out.append((task["id"], Transcript(
+                final_output=t["final_output"],
+                tool_calls=[ToolCall(c["name"], c.get("args") or {}, c.get("result")) for c in t["tool_calls"]],
+                outcome=t.get("outcome"), turns=t.get("turns") or [], usage=t.get("usage") or {},
+                error=t.get("error")), t["passed"]))
+    return out
 
 
 def markdown(report: SuiteReport) -> str:
