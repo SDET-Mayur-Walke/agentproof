@@ -9,3 +9,7 @@ __pycache__/
 *.egg-info/
 .DS_Store
 ci-results/
+
+# LinkedIn videos / recordings (large binaries)
+docs/linkedin/*.mp4
+docs/linkedin/*.mov

@@ -1,0 +1,110 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { width: 1080px; height: 1350px; position: relative; overflow: hidden;
+         font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; color: #1f2937;
+         background-color: #F4F3EF;
+         background-image: radial-gradient(#cfccc3 1.6px, transparent 1.6px); background-size: 26px 26px; }
+  .title { position: absolute; left: 56px; top: 44px; }
+  .eyebrow { font-size: 21px; font-weight: 800; letter-spacing: 3px; color: #C2410C; }
+  h1 { font-family: "New York", Georgia, serif; font-size: 44px; line-height: 1.08; margin-top: 8px; color: #14213D; }
+  .frame { position: absolute; border: 2px solid #b9b5aa; border-radius: 14px; background: rgba(255,255,255,.55); }
+  .frame .ft { position: absolute; top: -17px; left: 18px; background: #14213D; color: #fff; font-size: 17px;
+               font-weight: 800; letter-spacing: 1.5px; padding: 6px 12px; border-radius: 7px; }
+  .note { position: absolute; border-radius: 4px; padding: 13px 15px; font-size: 19px; line-height: 1.25;
+          box-shadow: 2px 4px 0 rgba(0,0,0,.08), 0 8px 18px rgba(0,0,0,.08); }
+  .note b { display: block; font-size: 20px; margin-bottom: 3px; }
+  .note code { font-family: "SF Mono", Menlo, monospace; font-size: 16px; }
+  .y { background: #FFE98A; } .b { background: #CFE3FB; } .g { background: #C9F0D3; }
+  .p { background: #F6D3E8; } .o { background: #FFD9B8; } .w { background: #fff; border: 1.5px solid #d6d2c7; }
+  .dark { background: #14213D; color: #fff; }
+  .tilt1 { transform: rotate(-1.4deg); } .tilt2 { transform: rotate(1.2deg); } .tilt3 { transform: rotate(-0.6deg); }
+  svg { position: absolute; left: 0; top: 0; pointer-events: none; }
+  .lbl { position: absolute; font-size: 15px; color: #6b7280; font-style: italic; }
+  .stamp { position: absolute; font-size: 17px; font-weight: 800; padding: 6px 12px; border-radius: 8px; }
+  .pass { background: #1F8A5B; color: #fff; } .block { background: #C0392B; color: #fff; }
+  .foot { position: absolute; left: 56px; right: 56px; bottom: 30px; display: flex; justify-content: space-between;
+          font-size: 17px; color: #6b7280; }
+  .foot b { color: #14213D; }
+</style></head>
+<body>
+  <div class="title">
+    <div class="eyebrow">AGENTPROOF · HOW IT FITS TOGETHER</div>
+    <h1>Test what the agent does,<br>then test the tester.</h1>
+  </div>
+
+  <div style="position:absolute; left:0; top:62px; width:1080px; height:1240px;">
+  <!-- arrows -->
+  <svg width="1080" height="1350">
+    <defs><marker id="a" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto">
+      <path d="M0,1 L14,8 L0,15 z" fill="#C2410C"/></marker>
+      <marker id="g" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" refX="12" refY="8" orient="auto">
+      <path d="M0,1 L14,8 L0,15 z" fill="#6b7280"/></marker></defs>
+    <g stroke="#C2410C" stroke-width="3" fill="none" marker-end="url(#a)">
+      <!-- frame 1: user -> agent -> tools -> bookings -->
+      <path d="M262,268 L300,268"/>
+      <path d="M528,268 L566,268"/>
+      <path d="M800,268 L838,268"/>
+      <!-- agent run feeds transcript -->
+      <path d="M680,330 C680,390 330,380 300,452"/>
+      <!-- frame 2 chain -->
+      <path d="M262,505 L300,505"/>
+      <path d="M528,505 L566,505"/>
+      <path d="M800,505 L838,505"/>
+      <!-- graders -> calibration and CI -->
+      <path d="M690,575 C690,640 300,650 270,738"/>
+      <path d="M940,575 L940,738"/>
+    </g>
+    <g stroke="#C2410C" stroke-width="3" fill="none" marker-end="url(#a)">
+      <!-- frame 3 calibration chain -->
+      <path d="M190,872 L190,920"/>
+      <path d="M190,1022 L190,1070"/>
+      <!-- frame 4 CI chain -->
+      <path d="M800,836 L800,870"/>
+      <path d="M800,960 L800,994"/>
+      <path d="M750,1082 L690,1132"/>
+      <path d="M850,1082 L910,1132"/>
+    </g>
+    <g stroke="#6b7280" stroke-width="2.5" fill="none" stroke-dasharray="7 6" marker-end="url(#g)">
+      <!-- calibrated judge informs the report -->
+      <path d="M372,1110 C470,1110 520,1050 640,1040"/>
+    </g>
+  </svg>
+
+  <!-- FRAME 1: the agent -->
+  <div class="frame" style="left:40px; top:178px; width:1000px; height:170px;"><div class="ft">1 · THE AGENT</div></div>
+  <div class="note y tilt1" style="left:64px; top:212px; width:196px;"><b>User</b>"Book the cheapest Pune → Goa flight for 3"</div>
+  <div class="note dark tilt2" style="left:302px; top:216px; width:224px;"><b>Flight agent</b>qwen2.5:7b on Ollama · free</div>
+  <div class="note b tilt3" style="left:568px; top:206px; width:230px;"><b>Tools</b><code>search_flights()</code><br><code>book_flight()</code></div>
+  <div class="note w tilt1" style="left:840px; top:214px; width:180px;"><b>Bookings</b>what really happened</div>
+
+  <!-- FRAME 2: the eval -->
+  <div class="frame" style="left:40px; top:420px; width:1000px; height:180px;"><div class="ft">2 · AGENTPROOF EVAL</div></div>
+  <div class="note o tilt2" style="left:64px; top:452px; width:196px;"><b>8 scenarios</b>× 5 runs each (agents vary)</div>
+  <div class="note w tilt1" style="left:302px; top:448px; width:224px;"><b>Transcript</b>tool calls · bookings · reply</div>
+  <div class="note g tilt3" style="left:568px; top:444px; width:230px;"><b>Code checks</b>outcome · path · arguments · every price traced</div>
+  <div class="note dark tilt2" style="left:840px; top:452px; width:180px;"><b>Pass rule</b>ALL checks ✓</div>
+
+  <!-- FRAME 3: judge calibration -->
+  <div class="frame" style="left:40px; top:690px; width:470px; height:500px;"><div class="ft">3 · TEST THE AI JUDGE</div></div>
+  <div class="note p tilt1" style="left:68px; top:740px; width:250px;"><b>Mutation testing</b>plant 24 known mistakes in good answers</div>
+  <div class="note y tilt2" style="left:68px; top:924px; width:250px;"><b>AI judge</b>sees the reply + the tool calls</div>
+  <div class="note g tilt3" style="left:68px; top:1074px; width:300px;"><b>Agreement 0.08 → 0.85</b>trusted as a second opinion</div>
+  <div class="lbl" style="left:338px; top:770px; width:150px;">labels checked by the code graders</div>
+
+  <!-- FRAME 4: CI gate -->
+  <div class="frame" style="left:570px; top:690px; width:470px; height:500px;"><div class="ft">4 · CI GATE · $0</div></div>
+  <div class="note w tilt2" style="left:690px; top:752px; width:220px;"><b>Pull request</b>changes the agent</div>
+  <div class="note b tilt1" style="left:660px; top:874px; width:280px;"><b>GitHub Actions</b>Ollama on the runner, runs the eval</div>
+  <div class="note dark tilt3" style="left:690px; top:998px; width:220px;"><b>Gate</b>regression tasks must pass every run</div>
+  <div class="stamp pass" style="left:612px; top:1136px;">✓ merge</div>
+  <div class="stamp block" style="left:872px; top:1136px;">✗ blocked</div>
+
+  </div>
+
+  <div class="foot">
+    <div><b>Free, local models</b> · open source · MIT</div>
+    <div><b>github.com/SDET-Mayur-Walke/agentproof</b></div>
+  </div>
+</body></html>

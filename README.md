@@ -57,6 +57,8 @@ report = await calibrate(labelled_items, my_judge, repeats=3)
 print(report.summary())          # ends with: VERDICT: fit to gate / NOT fit to gate: ...
 ```
 
+![How agentproof fits together](docs/linkedin/1_architecture.png)
+
 ## The idea in one table
 
 | Concept | Meaning |
@@ -116,6 +118,14 @@ python -m agentproof gate "results/*_hardened.json" --baseline results/main.json
 python -m agentproof compare results/a.json results/b.json
 ```
 
+## One-command demo
+
+```bash
+ollama serve &                       # free local model: ollama pull qwen2.5:7b
+pip install -e ".[openai-agents]"
+./scripts/demo.sh                    # ~1 min: baseline agent BLOCKED, hardened agent PASS
+```
+
 ## Run the tests
 
 ```bash
@@ -135,7 +145,9 @@ python tests/test_core.py      # no dependencies, no LLM (11 tests)
 - [ ] Langfuse tracing: every trial linked to its trace
 - [ ] Safety pack: prompt-injection and tool-misuse tasks
 
-## Background
+## Methodology and references
 
-The vocabulary follows Anthropic's
-[Demystifying evals for AI agents](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents).
+Built on Anthropic's agent-eval vocabulary, pass^k from τ-bench, LLM-as-a-judge
+research (MT-Bench), Cohen's kappa, and classic mutation testing (DeMillo,
+Lipton & Sayward, 1978). [docs/METHODOLOGY.md](docs/METHODOLOGY.md) lists each
+source, what agentproof takes from it, and what it adds.
