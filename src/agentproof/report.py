@@ -71,6 +71,34 @@ def markdown(report: SuiteReport) -> str:
     return "\n".join(out)
 
 
+def compare(reports: dict[str, SuiteReport], judge: str | None = None) -> str:
+    """Markdown table: one column per variant (prompt, model, config...),
+    one row per task, dot grid per cell, plus summary rows."""
+    names = list(reports)
+    first = reports[names[0]]
+    out = ["| Task | " + " | ".join(names) + " |", "|---|" + "---|" * len(names)]
+    for i, r in enumerate(first.tasks):
+        cells = []
+        for n in names:
+            tr = reports[n].tasks[i]
+            cells.append("".join("●" if t.passed else "○" for t in tr.trials) + f" {tr.pass_rate:.0%}")
+        out.append(f"| `{r.task.id}` | " + " | ".join(cells) + " |")
+    out.append("| **Trial pass rate** | " + " | ".join(f"**{reports[n].pass_rate:.0%}**" for n in names) + " |")
+    out.append("| **Tasks passing all trials (pass^k)** | " + " | ".join(
+        f"{sum(t.pass_hat_k for t in reports[n].tasks)}/{len(reports[n].tasks)}" for n in names) + " |")
+    if judge:
+        cells = []
+        for n in names:
+            hit, total = reports[n].looks_right_is_wrong(judge)
+            cells.append(f"{hit}/{total}" if total else "–")
+        out.append(f"| Judge rated a FAILED trial as good | " + " | ".join(cells) + " |")
+        def f(x):
+            return "–" if x is None else f"{x:.2f}"
+        out.append("| Judge mean on passed / failed trials | " + " | ".join(
+            "{} / {}".format(*map(f, reports[n].judge_split(judge))) for n in names) + " |")
+    return "\n".join(out)
+
+
 def gate(report: SuiteReport, regression_min: float = 1.0, capability_min: float | None = None) -> list[str]:
     """Reasons to block a change. Regression tasks must hold their floor;
     capability tasks only gate if you set a minimum."""

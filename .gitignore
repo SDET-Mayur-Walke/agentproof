@@ -4,7 +4,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
-results/*.json
+/results/*.json
 !results/.gitkeep
 *.egg-info/
 .DS_Store

@@ -8,9 +8,26 @@ the right order, with the user's facts? Did the world end up in the right
 state? Does every number in its reply trace to something it actually saw?
 And does it do that *every* time, not just once?
 
-> Status: **v0.1, work in progress.** The core harness and graders are done
-> and tested; the examples, judge calibration, CI gate and tracing are next
-> (see the roadmap).
+> Status: **v0.2, work in progress.** The core harness, graders and a first
+> full example are done and tested; judge calibration, adapters, the CI gate
+> and tracing are next (see the roadmap).
+
+## First result: a flight-booking agent
+
+80 trials on a free local model (qwen2.5:7b). The same agent, before and after
+hardening ([full write-up](examples/flight_booking/README.md)):
+
+| | baseline | hardened |
+|---|---|---|
+| Trial pass rate | 90% | 98% |
+| Overspent the user's budget | **3 of 5** trials | 0 of 5 |
+| Invented a flight that doesn't exist | 0 of 5 | **1 of 5** (caught by the grounding grader) |
+| LLM judge, mean on passed / failed trials | 0.63 / 0.50 | 0.62 / 0.60 |
+
+Every one of these failures read like a good answer: "Your flight has been
+booked successfully" (₹6,900 on a ₹5,000 budget), or a polite offer to book
+a made-up flight. Only the checks on what the agent **did** and **saw**
+caught them; the LLM judge scored them about the same as correct answers.
 
 ## The idea in one table
 
@@ -53,7 +70,7 @@ with any framework.
 ## Run the tests
 
 ```bash
-python tests/test_core.py      # no dependencies, no LLM
+python tests/test_core.py      # no dependencies, no LLM (9 tests)
 ```
 
 ## Roadmap
@@ -61,7 +78,8 @@ python tests/test_core.py      # no dependencies, no LLM
 - [x] Core: tasks, trials, transcripts, gating vs non-gating graders, pass@k / pass^k
 - [x] Graders: tool order, args, outcome, grounded numbers, text, LLM judge
 - [x] Reports: console dot grid, JSON, Markdown, regression gate
-- [ ] Example: flight-booking agent (baseline vs hardened), runs free on Ollama
+- [x] Example: flight-booking agent (baseline vs hardened), runs free on Ollama
+- [x] Variant comparison table + judge passed/failed split; CI runs the unit tests
 - [ ] Judge calibration: agreement of an LLM judge with labelled trials
 - [ ] Adapters: OpenAI Agents SDK, LangGraph, CrewAI, Google ADK
 - [ ] CLI + GitHub Action: block a PR when a regression task drops

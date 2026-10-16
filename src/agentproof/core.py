@@ -185,3 +185,12 @@ class SuiteReport:
         failed = [t for r in self.tasks for t in r.trials if not t.passed]
         judged = [g for t in failed for g in t.grades if g.grader == judge]
         return sum(g.score >= threshold for g in judged), len(judged)
+
+    def judge_split(self, judge: str) -> tuple[float | None, float | None]:
+        """Mean judge score on PASSED vs FAILED trials. If they're close, the
+        judge can't tell good from bad on this agent."""
+        def mean(passed: bool):
+            xs = [g.score for r in self.tasks for t in r.trials if t.passed == passed
+                  for g in t.grades if g.grader == judge]
+            return sum(xs) / len(xs) if xs else None
+        return mean(True), mean(False)

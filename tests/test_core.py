@@ -111,6 +111,22 @@ def test_gate_blocks_regression_drop_only():
     assert to_json(r)["tasks"][0]["id"] == "reg" and "pass" in console(r)
 
 
+def test_compare_table_and_judge_split():
+    async def judge_fn(rubric, task, t):
+        return (0.9, "") if t.outcome["bookings"] else (0.6, "")
+    graders = task().graders + [G.llm_judge("judge", "?", judge_fn)]
+    async def good(t):
+        return booking_transcript()
+    async def bad(t):
+        return booking_transcript(book=False)
+    reports = {"a": run([task(graders=graders)], good, trials=2), "b": run([task(graders=graders)], bad, trials=2)}
+    assert reports["a"].judge_split("judge") == (0.9, None)
+    assert reports["b"].judge_split("judge") == (None, 0.6)
+    from agentproof.report import compare
+    table = compare(reports, judge="judge")
+    assert "●● 100%" in table and "○○ 0%" in table and "0.90 / –" in table
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

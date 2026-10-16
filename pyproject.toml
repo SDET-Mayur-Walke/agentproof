@@ -9,7 +9,7 @@ authors = [{ name = "Mayur Walke" }]
 dependencies = []          # the core has no dependencies; adapters bring their own
 
 [project.optional-dependencies]
-openai-agents = ["openai-agents>=0.22"]
+openai-agents = ["openai-agents>=0.22", "openai>=1.0"]
 dev = ["pytest>=8"]
 
 [build-system]
