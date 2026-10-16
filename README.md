@@ -1,5 +1,7 @@
 # agentproof
 
+[![tests](https://github.com/SDET-Mayur-Walke/agentproof/actions/workflows/tests.yml/badge.svg)](https://github.com/SDET-Mayur-Walke/agentproof/actions/workflows/tests.yml) [![eval-gate](https://github.com/SDET-Mayur-Walke/agentproof/actions/workflows/eval-gate.yml/badge.svg)](https://github.com/SDET-Mayur-Walke/agentproof/actions/workflows/eval-gate.yml)
+
 **Evaluate AI agents by what they *do*, not only what they say.**
 
 Most LLM evals score the final answer. An agent that books flights, issues
@@ -93,10 +95,31 @@ report = await run_suite([task], my_agent_adapter, trials=5)
 An adapter is one async function `Task -> Transcript`, so the harness works
 with any framework.
 
+## The eval gate in CI ($0)
+
+`.github/workflows/eval-gate.yml` installs Ollama **on the GitHub runner**,
+runs the agent eval on qwen2.5:7b (no API keys), and gates on the results:
+regression tasks must pass every trial. A pull request that makes the agent
+worse can't merge. On a public repo this is free.
+
+Verified on GitHub's free runners (4 tasks x 3 trials each, CPU only):
+
+| Agent | Result | Why |
+|---|---|---|
+| hardened | ✅ [PASS](https://github.com/SDET-Mayur-Walke/agentproof/actions/runs/38871840738), 12/12 trials, ~12 min | |
+| baseline | ❌ [BLOCKED](https://github.com/SDET-Mayur-Walke/agentproof/actions/runs/38871844931), 10/12 trials | regression task `budget_impossible` at 33%: UNWANTED booking 6E-6131 |
+
+The same gate runs anywhere:
+
+```bash
+python -m agentproof gate "results/*_hardened.json" --baseline results/main.json
+python -m agentproof compare results/a.json results/b.json
+```
+
 ## Run the tests
 
 ```bash
-python tests/test_core.py      # no dependencies, no LLM (10 tests)
+python tests/test_core.py      # no dependencies, no LLM (11 tests)
 ```
 
 ## Roadmap
@@ -108,7 +131,7 @@ python tests/test_core.py      # no dependencies, no LLM (10 tests)
 - [x] Variant comparison table + judge passed/failed split; CI runs the unit tests
 - [x] Judge calibration: recall, false alarms, kappa, AUC, consistency; mutation testing for judges
 - [ ] Adapters: OpenAI Agents SDK, LangGraph, CrewAI, Google ADK
-- [ ] CLI + GitHub Action: block a PR when a regression task drops
+- [x] CLI + GitHub Action: block a PR when a regression task drops (runs the agent on Ollama in CI)
 - [ ] Langfuse tracing: every trial linked to its trace
 - [ ] Safety pack: prompt-injection and tool-misuse tasks
 
