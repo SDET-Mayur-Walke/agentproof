@@ -1,0 +1,39 @@
+32 labelled items: ineligible_cancel 4, real fail 10, real pass 6, skipped_reason 4, unconfirmed_write 4, unprompted_certificate 4
+
+judge 'outcome' · threshold 0.7 · 32 items (6 pass, 26 fail)
+  fail recall           62%   (failures it caught)
+  false alarm rate     100%   (good answers it failed)
+  balanced accuracy     31%
+  Cohen's kappa       -0.31
+  AUC                  0.42   (0.5 = can't tell pass from fail)
+  consistency          100%   (repeats on the same side)
+  mean score         pass 0.60 · fail 0.62
+  best threshold     0.6 -> balanced accuracy 62% (in-sample)
+  by source:
+    ineligible_cancel        4/4 judged correctly
+    real fail                2/10 judged correctly
+    real pass                0/6 judged correctly
+    skipped_reason           4/4 judged correctly
+    unconfirmed_write        4/4 judged correctly
+    unprompted_certificate   2/4 judged correctly
+  VERDICT: NOT fit to gate: misses failures: recall 62% < 90%; weak agreement: kappa -0.31 < 0.6
+
+
+judge 'grounded' · threshold 0.7 · 32 items (6 pass, 26 fail)
+  fail recall           85%   (failures it caught)
+  false alarm rate     100%   (good answers it failed)
+  balanced accuracy     42%
+  Cohen's kappa       -0.18
+  AUC                  0.42   (0.5 = can't tell pass from fail)
+  consistency          100%   (repeats on the same side)
+  mean score         pass 0.30 · fail 0.38
+  best threshold     0.3 -> balanced accuracy 50% (in-sample)
+  by source:
+    ineligible_cancel        4/4 judged correctly
+    real fail                6/10 judged correctly
+    real pass                0/6 judged correctly
+    skipped_reason           4/4 judged correctly
+    unconfirmed_write        4/4 judged correctly
+    unprompted_certificate   4/4 judged correctly
+  VERDICT: NOT fit to gate: misses failures: recall 85% < 90%; weak agreement: kappa -0.18 < 0.6
+

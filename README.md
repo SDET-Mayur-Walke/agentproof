@@ -31,6 +31,47 @@ booked successfully" (₹6,900 on a ₹5,000 budget), or a polite offer to book
 a made-up flight. Only the checks on what the agent **did** and **saw**
 caught them; the LLM judge scored them about the same as correct answers.
 
+## Second result: τ²-bench, an industry benchmark
+
+[τ²-bench](https://github.com/sierra-research/tau2-bench) by **Sierra
+Research** (MIT) tests customer-service agents: the agent follows a real-world
+style airline policy, talks to an LLM-simulated customer, and reads and writes
+a mock airline database. Its reward checks the **final database**.
+agentproof loads its runs and adds graders for the **process**, rule by rule
+from the airline policy: explicit "yes" before every write, cancellation
+eligibility, reason asked, compensation rules, tool loops, and a check for the
+simulated customer leaking its own script
+([details](examples/tau2_airline/README.md)).
+
+The first finding, qwen3:8b on airline task 0 (customer wants to cancel a
+booking that policy says can't be cancelled):
+
+| | Ollama default context (4,096) | context 16,384 |
+|---|---|---|
+| **τ²-bench reward** | **0** | **0** |
+| Asked the reason for cancelling | no | yes |
+| Cancelled a booking it must not cancel | **yes**, refunded $208 | no, refused |
+| Gave away compensation nobody asked for | no | **yes**, $200 |
+| Simulated customer stayed in character | no | yes |
+
+Same score, different agent. The policy plus tool definitions is ~4,700
+tokens; Ollama's default 4,096 window silently cut the policy off. Fixing it
+cured one violation and exposed another, and the benchmark score couldn't show
+either. [Full findings](examples/tau2_airline/FINDINGS.md).
+
+The full run, airline tasks 0–9 × 2 trials (qwen3:8b, free, local):
+
+| | |
+|---|---|
+| Trials passed | 6 / 20 · pass^2 = 3 / 10 tasks |
+| τ²-bench failures the policy graders explain | **14 / 14** (τ²-bench alone: "reward 0") |
+| Most common | write without a "yes" · ineligible cancellation · invented membership level · agent over-thinks and never replies |
+| Best LLM judge (qwen2.5:7b, tool calls + policy) | caught 16/16 planted violations but only **2/10 real ones**: not fit to gate |
+
+Planted mistakes are easier to spot than real ones, so a judge calibrated on
+mutants alone looks better than it is. [Per-task results and the judge
+calibration](examples/tau2_airline/FINDINGS.md).
+
 ## Can you trust your LLM judge? Measure it
 
 `agentproof.calibration` grades a judge like a classifier: failures caught,
@@ -129,7 +170,8 @@ pip install -e ".[openai-agents]"
 ## Run the tests
 
 ```bash
-python tests/test_core.py      # no dependencies, no LLM (11 tests)
+python tests/test_core.py          # no dependencies, no LLM (11 tests)
+python tests/test_tau2_graders.py  # τ²-bench graders + replays of real runs (9 tests)
 ```
 
 ## Roadmap
@@ -140,6 +182,7 @@ python tests/test_core.py      # no dependencies, no LLM (11 tests)
 - [x] Example: flight-booking agent (baseline vs hardened), runs free on Ollama
 - [x] Variant comparison table + judge passed/failed split; CI runs the unit tests
 - [x] Judge calibration: recall, false alarms, kappa, AUC, consistency; mutation testing for judges
+- [x] τ²-bench (Sierra Research) airline adapter + policy graders; real runs replayed as CI tests
 - [ ] Adapters: OpenAI Agents SDK, LangGraph, CrewAI, Google ADK
 - [x] CLI + GitHub Action: block a PR when a regression task drops (runs the agent on Ollama in CI)
 - [ ] Langfuse tracing: every trial linked to its trace

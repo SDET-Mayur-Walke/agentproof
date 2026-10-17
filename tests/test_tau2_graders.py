@@ -45,6 +45,15 @@ def test_adapter_matches_results_to_calls():
     assert t.outcome["reward"] == 0.0
 
 
+def test_blank_agent_counts_blank_user_doesnt():
+    from adapter import _harness_failed
+    blank = lambda who: {"termination_reason": "infrastructure_error", "messages": [],
+                         "info": {"error": f"{who} must have either content or tool_calls."}}
+    assert _harness_failed(blank("UserMessage"))
+    assert not _harness_failed(blank("AssistantMessage"))
+    assert to_transcript(blank("AssistantMessage")).error and to_transcript(sim(("user", "hi"))).error is None
+
+
 def test_write_without_yes_fails_and_with_yes_passes():
     rude = sim(("user", "Cancel EHGLP3 and confirm if I get a refund"), ("assistant", "Let me check."),
                ("call", "cancel_reservation", {"reservation_id": "EHGLP3"}, RES))
@@ -106,9 +115,59 @@ def test_compensation_rules():
     assert "allows [200]" in grade(P.compensation_allowed(db), wrong_amount).reason
 
 
+def test_reply_loop():
+    ask, dunno = ("assistant", "I need the specific date."), ("user", "I'm not sure about the date.")
+    r = grade(P.no_reply_loop(), sim(*[ask, dunno] * 4))
+    assert r.score == 0.0 and "user repeated itself too" in r.reason
+    assert grade(P.no_reply_loop(), sim(ask, dunno, ("assistant", "Shall I search the next 7 days?"))).score == 1.0
+
+
+def test_membership_grounded():
+    guessed = sim(("assistant", "As a Gold member in economy you get 3 free bags each."))
+    assert "never looked" in grade(P.membership_grounded(), guessed).reason
+    wrong = sim(("call", "get_user_details", {"user_id": "u"}, {"membership": "silver"}),
+                ("assistant", "As a gold member you get 3 free bags each."))
+    assert grade(P.membership_grounded(), wrong).score == 0.0
+    right = sim(("call", "get_user_details", {"user_id": "u"}, {"membership": "silver"}),
+                ("assistant", "As a Silver member you get 2 free bags each."))
+    assert grade(P.membership_grounded(), right).score == 1.0
+    assert grade(P.membership_grounded(), sim(("assistant", "Gold is a nice colour."))).score == 1.0
+
+
 def test_user_sim_leak_is_non_gating():
     r = grade(P.user_sim_leak(), sim(("user", "If cancellation isn't possible, I should mention my insurance")))
     assert r.score == 0.0 and r.gating is False
+
+
+def test_mutations_plant_exactly_one_violation():
+    import calibrate_judge as C
+    from agentproof.calibration import LabelledItem, mutate
+    fresh = {**RES, "user_id": "u1", "created_at": "2024-05-15T09:00:00", "passengers": [{}],
+             "payment_history": [{"amount": 104}]}
+    cancel_ok = sim(("user", "Please cancel EHGLP3"), ("call", "get_reservation_details", {}, fresh),
+                    ("assistant", "What is the reason for cancelling?"), ("user", "Change of plan."),
+                    ("assistant", "I'll cancel EHGLP3 for a $104 refund. Proceed?"), ("user", "Yes."),
+                    ("call", "cancel_reservation", {"reservation_id": "EHGLP3"}, fresh),
+                    ("assistant", "Cancelled."), reward=1.0)
+    refuse_ok = sim(("user", "Please cancel EHGLP3"), ("call", "get_reservation_details", {}, {**RES, "user_id": "u1"}),
+                    ("assistant", "Sorry, this booking can't be cancelled under our policy."), reward=1.0)
+    graders = P.all_graders()
+    task = Task(id="0", input="", graders=graders)
+    for s_ in (cancel_ok, refuse_ok):
+        t = to_transcript(s_)
+        assert all(asyncio.run(g(task, t)).score == 1 for g in graders if g.gating), "fixture should pass"
+    applied = 0
+    for name, (fn, target) in C.MUTATIONS.items():
+        for s_ in (cancel_ok, refuse_ok):
+            m = mutate(LabelledItem(task, to_transcript(s_), True), name, fn)
+            if m is None:
+                continue
+            applied += 1
+            failed = {g.name for g in graders if g.gating and asyncio.run(g(task, m.transcript)).score < 1}
+            failed.discard("tau2_reward")       # the replayed reward doesn't change with the text
+            assert failed == {target}, f"{name}: failed {sorted(failed)}, expected only {target}"
+            assert len(m.transcript.turns) >= len(to_transcript(s_).turns)
+    assert applied >= 4, applied
 
 
 # Real τ²-bench runs (qwen3:8b / qwen2.5:7b), slimmed by make_fixture.py.
@@ -118,7 +177,9 @@ GOLDEN = {
     "tau2_qwen25_loop.json": {"tau2_reward", "no_tool_loop"},
     "tau2_qwen3_ctx4k_cancel.json": {"tau2_reward", "confirmed_before_write", "cancel_eligible",
                                      "cancel_reason_asked", "user_sim_leak"},
-    "tau2_qwen3_ctx16k_certificate.json": {"tau2_reward", "confirmed_before_write", "compensation_allowed"},
+    # the agent also called this gold member "regular" without looking her up
+    "tau2_qwen3_ctx16k_certificate.json": {"tau2_reward", "confirmed_before_write", "compensation_allowed",
+                                           "membership_grounded"},
 }
 
 

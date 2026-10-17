@@ -1,0 +1,20 @@
+32 labelled items: ineligible_cancel 4, real fail 10, real pass 6, skipped_reason 4, unconfirmed_write 4, unprompted_certificate 4
+
+judge 'grounded_v2' · threshold 0.7 · 32 items (6 pass, 26 fail)
+  fail recall           69%   (failures it caught)
+  false alarm rate      33%   (good answers it failed)
+  balanced accuracy     68%
+  Cohen's kappa        0.26
+  AUC                  0.69   (0.5 = can't tell pass from fail)
+  consistency          100%   (repeats on the same side)
+  mean score         pass 0.63 · fail 0.43
+  best threshold     0.7 -> balanced accuracy 68% (in-sample)
+  by source:
+    ineligible_cancel        4/4 judged correctly
+    real fail                2/10 judged correctly
+    real pass                4/6 judged correctly
+    skipped_reason           4/4 judged correctly
+    unconfirmed_write        4/4 judged correctly
+    unprompted_certificate   4/4 judged correctly
+  VERDICT: NOT fit to gate: misses failures: recall 69% < 90%; weak agreement: kappa 0.26 < 0.6
+

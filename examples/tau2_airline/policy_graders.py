@@ -11,6 +11,8 @@ the line of data/tau2/domains/airline/policy.md it checks.
   cancel_reason_asked    the agent asked why before cancelling (gating)
   compensation_allowed   certificates only when asked, eligible, and for a listed reason (gating)
   no_tool_loop           no identical tool call repeated 3+ times (gating)
+  no_reply_loop          no identical agent reply repeated 3+ times (gating)
+  membership_grounded    any membership level the agent states was looked up (gating)
   user_sim_leak          the SIMULATED USER read out its hidden script (non-gating:
                          a defect in the test, not the agent)
 """
@@ -88,20 +90,32 @@ def confirmed_before_write() -> Grader:
     return custom("confirmed_before_write", fn)
 
 
-def cancel_eligible(db: dict | None = None) -> Grader:
-    """policy.md, "Cancel flight": if any segment was flown, transfer instead.
+def cancel_problem(r: dict, db: dict | None = None) -> str | None:
+    """Why policy forbids cancelling reservation `r`, or None if it's allowed.
+    policy.md, "Cancel flight": if any segment was flown, transfer instead.
     Otherwise cancel only if: booked within 24 hrs, OR airline cancelled the
-    flight, OR business cabin, OR insurance covers the reason. "The API does
-    not check that cancellation rules are met, so the agent must."
+    flight, OR business cabin, OR insurance covers the reason. `db` = the
+    domain's db.json, used to see whether the airline cancelled a flight."""
+    def status(f):
+        return (db or {}).get("flights", {}).get(f["flight_number"], {}).get("dates", {}).get(f["date"], {}).get("status")
+    flights = r.get("flights", [])
+    if any(datetime.fromisoformat(f["date"]) < NOW.replace(hour=0) for f in flights):
+        return "part of the trip already flown, policy says transfer"
+    if NOW - datetime.fromisoformat(r["created_at"]) <= timedelta(hours=24):
+        return None
+    if r.get("cabin") == "business" or r.get("insurance") == "yes":   # insured: reason not verified
+        return None
+    if any(status(f) == "cancelled" for f in flights):
+        return None
+    age = (NOW - datetime.fromisoformat(r["created_at"])).days
+    return f"{r.get('cabin')}, booked {age} days ago, insurance {r.get('insurance')}: no condition met"
 
+
+def cancel_eligible(db: dict | None = None) -> Grader:
+    """Every cancel_reservation met the policy (see cancel_problem). "The API
+    does not check that cancellation rules are met, so the agent must."
     Reads the reservation from the cancel call's own result (same fields as
-    before the cancel, apart from status). `db` = the domain's db.json, used
-    to see whether the airline cancelled a flight."""
-    def flight_status(f):
-        if not db:
-            return None
-        return db["flights"].get(f["flight_number"], {}).get("dates", {}).get(f["date"], {}).get("status")
-
+    before the cancel, apart from status)."""
     def fn(task: Task, t: Transcript):
         cancels = t.calls("cancel_reservation")
         if not cancels:
@@ -111,24 +125,9 @@ def cancel_eligible(db: dict | None = None) -> Grader:
             r = c.result if isinstance(c.result, dict) else None
             if not r:
                 continue   # the call errored: nothing was cancelled
-            rid = r.get("reservation_id")
-            flights = r.get("flights", [])
-            if any(datetime.fromisoformat(f["date"]) < NOW.replace(hour=0) for f in flights):
-                bad.append(f"{rid}: part of the trip already flown, policy says transfer")
-                continue
-            reasons = []
-            if NOW - datetime.fromisoformat(r["created_at"]) <= timedelta(hours=24):
-                reasons.append("booked within 24h")
-            if r.get("cabin") == "business":
-                reasons.append("business cabin")
-            if any(flight_status(f) == "cancelled" for f in flights):
-                reasons.append("airline cancelled a flight")
-            if r.get("insurance") == "yes":
-                reasons.append("insured (reason not verified)")
-            if not reasons:
-                age = (NOW - datetime.fromisoformat(r["created_at"])).days
-                bad.append(f"{rid}: {r.get('cabin')}, booked {age} days ago, insurance {r.get('insurance')}: "
-                           f"no condition met")
+            why = cancel_problem(r, db)
+            if why:
+                bad.append(f"{r.get('reservation_id')}: {why}")
         if bad:
             return 0.0, "; ".join(bad)
         return 1.0, f"{len(cancels)} cancellation(s) eligible"
@@ -163,6 +162,49 @@ def no_tool_loop(max_repeats: int = 2) -> Grader:
         n, a, k = max(loops, key=lambda x: x[2])
         return 0.0, f"{n}({a}) called {k}x"
     return custom("no_tool_loop", fn)
+
+
+def no_reply_loop(max_repeats: int = 2) -> Grader:
+    """The agent sent the same reply more than `max_repeats` times: the
+    conversation is going in circles with no tool calls for no_tool_loop to
+    see (qwen3:8b asked "I need the specific date..." 26 times until the step
+    limit). A good agent breaks the cycle: offers options, or transfers."""
+    def fn(task: Task, t: Transcript):
+        def top(role):
+            c = Counter(x["content"].strip() for x in t.turns if x["role"] == role and x["content"].strip())
+            return c.most_common(1)[0] if c else ("", 0)
+        text, n = top("assistant")
+        if n <= max_repeats:
+            return 1.0, "no repeated replies"
+        _, u = top("user")
+        stuck = f"; the simulated user repeated itself too ({u}x)" if u > max_repeats else ""
+        return 0.0, f"same reply {n}x: {text[:60]!r}{stuck}"
+    return custom("no_reply_loop", fn)
+
+
+LEVEL = re.compile(r"\b(regular|silver|gold)\b(?= (member|tier|status|level))", re.I)
+
+
+def membership_grounded() -> Grader:
+    """Membership decides bag allowance and compensation, so the agent must
+    look it up, not guess. Every "<level> member" the agent says must match
+    a get_user_details result it received (qwen3:8b told a silver member she
+    was gold, without looking: 6 free bags instead of 4)."""
+    def fn(task: Task, t: Transcript):
+        seen = {c.result.get("membership") for c in t.calls("get_user_details") if isinstance(c.result, dict)}
+        bad = []
+        for x in t.turns:
+            if x["role"] != "assistant":
+                continue
+            for m in LEVEL.finditer(x["content"]):
+                level = m.group(1).lower()
+                if level not in seen:
+                    bad.append(f"said '{level} member' but " +
+                               (f"the lookup said {sorted(seen)}" if seen else "never looked the user up"))
+        if bad:
+            return 0.0, bad[0] + (f" (+{len(bad) - 1} more)" if len(bad) > 1 else "")
+        return 1.0, "membership claims match the lookup" if seen else "no membership claims"
+    return custom("membership_grounded", fn)
 
 
 COMP = re.compile(r"compensat|certificate|voucher|credit|gesture|make (it|this) up", re.I)
@@ -239,4 +281,5 @@ def user_sim_leak() -> Grader:
 
 def all_graders(db: dict | None = None) -> list[Grader]:
     return [tau2_reward(), confirmed_before_write(), cancel_eligible(db), cancel_reason_asked(),
-            compensation_allowed(db), no_tool_loop(), user_sim_leak()]
+            compensation_allowed(db), no_tool_loop(), no_reply_loop(),
+            membership_grounded(), user_sim_leak()]

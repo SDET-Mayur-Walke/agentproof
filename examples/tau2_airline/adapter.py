@@ -49,6 +49,9 @@ def to_transcript(sim: dict) -> Transcript:
         turns.append(turn)
 
     ri = sim.get("reward_info") or {}
+    error = None
+    if sim.get("termination_reason") == "infrastructure_error":
+        error = "agent produced an empty reply on every attempt (reasoning used the whole reply budget)"
     final = next((t["content"] for t in reversed(turns)
                   if t["role"] == "assistant" and t["content"]), "")
     return Transcript(
@@ -61,17 +64,41 @@ def to_transcript(sim: dict) -> Transcript:
         turns=turns,
         usage={"seconds": sim.get("duration"),
                "max_prompt_tokens": max(prompt_tokens, default=0)},
+        error=error,
     )
+
+
+def _harness_failed(sim: dict) -> bool:
+    """τ²-bench gave up on the trial (infrastructure_error) for a reason that
+    isn't the agent's fault. An empty AGENT message ("AssistantMessage must
+    have either content or tool_calls": a thinking model used its whole reply
+    budget reasoning) is the agent failing, so it stays in, as a failed trial.
+    An empty simulated-USER message, or any other crash, is left out."""
+    if sim.get("termination_reason") != "infrastructure_error":
+        return False
+    return "AssistantMessage" not in str((sim.get("info") or {}).get("error", ""))
+
+
+def infrastructure_errors(path: str) -> list[str]:
+    """Task ids of trials left out because the harness, not the agent, failed."""
+    return [str(s["task_id"]) for s in json.load(open(path))["simulations"] if _harness_failed(s)]
 
 
 def load(path: str, graders: list[Grader]) -> tuple[list[Task], callable, int]:
     """Read a results.json -> (tasks, replay agent, trials per task).
 
     Only tasks with saved trials are returned. k is the smallest number of
-    trials any task has, so pass^k compares like with like on a partial run."""
+    trials any task has, so pass^k compares like with like on a partial run.
+    Trials the harness failed (see _harness_failed) are left out; count them
+    with infrastructure_errors()."""
     data = json.load(open(path))
-    by_task: dict[str, list[dict]] = defaultdict(list)
+    latest: dict[tuple, dict] = {}       # a resumed run re-runs failed trials: keep the last
     for sim in data["simulations"]:
+        latest[(str(sim["task_id"]), sim.get("trial", 0))] = sim
+    by_task: dict[str, list[dict]] = defaultdict(list)
+    for sim in latest.values():
+        if _harness_failed(sim):
+            continue
         by_task[str(sim["task_id"])].append(sim)
     for sims in by_task.values():
         sims.sort(key=lambda s: s.get("trial", 0))

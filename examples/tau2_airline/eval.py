@@ -21,11 +21,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from agentproof import run_suite                 # noqa: E402
 from agentproof import report as rpt             # noqa: E402
-from adapter import load                         # noqa: E402
+from adapter import infrastructure_errors, load  # noqa: E402
 from policy_graders import all_graders           # noqa: E402
 
 PROCESS = ["confirmed_before_write", "cancel_eligible", "cancel_reason_asked", "compensation_allowed",
-           "no_tool_loop"]
+           "no_tool_loop", "no_reply_loop",
+           "membership_grounded"]
 
 
 def main() -> None:
@@ -43,6 +44,9 @@ def main() -> None:
 
     print(f"\nτ²-bench airline · {len(tasks)} tasks × {k} trials · {os.path.basename(os.path.dirname(a.results))}\n")
     print(rpt.console(report))
+    infra = infrastructure_errors(a.results)
+    if infra:
+        print(f"\nleft out: {len(infra)} trial(s) τ²-bench couldn't run (infrastructure_error), tasks {sorted(set(infra))}")
 
     tau2_only = sum(g.score >= 1 for r in report.tasks for t in r.trials for g in t.grades if g.grader == "tau2_reward")
     n = sum(len(r.trials) for r in report.tasks)
@@ -58,12 +62,14 @@ def main() -> None:
             tau2_ok = g["tau2_reward"].score >= 1
             if tau2_ok and fails:
                 right_wrong += 1
-            if not tau2_ok and fails:
+            if not tau2_ok and (fails or t.transcript.error):
                 explained += 1
             if t.passed:
                 continue
             tag = "RIGHT OUTCOME, WRONG PROCESS" if tau2_ok else "FAIL"
             print(f"  task {r.task.id} trial {t.index}  [{tag}]  {g['tau2_reward'].reason}")
+            if t.transcript.error:
+                print(f"      ✗ {t.transcript.error}")
             for x in fails:
                 print(f"      ✗ {x}: {g[x].reason}")
             if g["user_sim_leak"].score < 1:
