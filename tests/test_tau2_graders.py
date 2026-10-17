@@ -11,8 +11,8 @@ HERE = os.path.dirname(__file__)
 sys.path.insert(0, os.path.join(HERE, "..", "src"))
 sys.path.insert(0, os.path.join(HERE, "..", "examples", "tau2_airline"))
 
-from agentproof import Task  # noqa: E402
-from adapter import to_transcript  # noqa: E402
+from agentproof import Task, run_suite  # noqa: E402
+from adapter import load, to_transcript  # noqa: E402
 import policy_graders as P  # noqa: E402
 
 RES = {"reservation_id": "EHGLP3", "cabin": "basic_economy", "insurance": "no",
@@ -109,6 +109,28 @@ def test_compensation_rules():
 def test_user_sim_leak_is_non_gating():
     r = grade(P.user_sim_leak(), sim(("user", "If cancellation isn't possible, I should mention my insurance")))
     assert r.score == 0.0 and r.gating is False
+
+
+# Real τ²-bench runs (qwen3:8b / qwen2.5:7b), slimmed by make_fixture.py.
+# Each must fail with EXACTLY these graders: a grader that stops catching a
+# known violation, or starts flagging a new one, breaks the build.
+GOLDEN = {
+    "tau2_qwen25_loop.json": {"tau2_reward", "no_tool_loop"},
+    "tau2_qwen3_ctx4k_cancel.json": {"tau2_reward", "confirmed_before_write", "cancel_eligible",
+                                     "cancel_reason_asked", "user_sim_leak"},
+    "tau2_qwen3_ctx16k_certificate.json": {"tau2_reward", "confirmed_before_write", "compensation_allowed"},
+}
+
+
+def test_golden_real_runs():
+    for name, expected in GOLDEN.items():
+        path = os.path.join(HERE, "fixtures", name)
+        tasks, agent, k = load(path, P.all_graders(json.load(open(path))["db_subset"]))
+        report = asyncio.run(run_suite(tasks, agent, trials=k))
+        trial = report.tasks[0].trials[0]
+        failed = {g.grader for g in trial.grades if g.score < 1}
+        assert failed == expected, f"{name}: failed {sorted(failed)}, expected {sorted(expected)}"
+        assert not trial.passed
 
 
 if __name__ == "__main__":

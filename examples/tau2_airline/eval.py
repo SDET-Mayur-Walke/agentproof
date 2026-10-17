@@ -35,7 +35,7 @@ def main() -> None:
     ap.add_argument("--out")
     a = ap.parse_args()
 
-    db = json.load(open(a.db)) if os.path.exists(a.db) else None
+    db = json.load(open(a.db)) if os.path.exists(a.db) else json.load(open(a.results)).get("db_subset")
     tasks, agent, k = load(a.results, all_graders(db))
     if not tasks:
         sys.exit("no saved trials in " + a.results)

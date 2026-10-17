@@ -39,6 +39,16 @@ PYTHONPATH=src python examples/tau2_airline/eval.py \
   ../tau2-bench/data/simulations/airline_qwen3/results.json
 ```
 
+## Tests in CI ($0, no model)
+
+Running τ²-bench on GitHub's free CPU runner would take hours per trial, so CI
+**replays** real saved runs instead. `tests/fixtures/tau2_*.json` are three real
+qwen runs (a 93-call loop, an ineligible cancellation, an unprompted $200
+certificate), slimmed by `make_fixture.py` with the slice of `db.json` they
+need. `tests/test_tau2_graders.py` asserts each one fails with exactly the
+expected graders, so a grader that stops catching a known violation breaks the
+build. The tests run in under a second.
+
 ## Gotcha: set `num_ctx`
 
 Ollama's default context window is **4,096 tokens**. The airline policy plus 14
