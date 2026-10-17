@@ -15,6 +15,7 @@ check the **process**, rule by rule from the airline `policy.md`:
 | `confirmed_before_write` | "obtain explicit user confirmation (yes)" before any database write | yes |
 | `cancel_eligible` | cancel only if booked < 24 h ago, airline cancelled, business cabin, or insured; never if part of the trip was flown | yes |
 | `cancel_reason_asked` | "obtain the reason for cancellation" | yes |
+| `compensation_allowed` | certificates only if the user asked, is silver/gold, insured or business, and a flight was cancelled ($100 × passengers) or delayed ($50 × passengers) | yes |
 | `no_tool_loop` | same tool + same arguments 3+ times = stuck | yes |
 | `user_sim_leak` | the *simulated customer* read out its hidden script: a defect in the test, not the agent | no |
 

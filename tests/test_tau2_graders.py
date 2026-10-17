@@ -81,6 +81,31 @@ def test_reason_asked_and_loops():
     assert grade(P.no_tool_loop(), sim(("call", "get_user_details", {"user_id": "u"}, {}))).score == 1.0
 
 
+def test_compensation_rules():
+    db = {"users": {"gold_u": {"membership": "gold"}, "reg_u": {"membership": "regular"}},
+          "flights": {"HAT156": {"dates": {"2024-05-17": {"status": "cancelled"}}},
+                      "HAT999": {"dates": {"2024-05-17": {"status": "available"}}}}}
+    res = lambda uid, fn="HAT156": {**RES, "user_id": uid, "passengers": [{}, {}],
+                                    "flights": [{"flight_number": fn, "date": "2024-05-17"}]}
+    ok = sim(("call", "get_reservation_details", {}, res("gold_u")), ("user", "My flight was cancelled, I want compensation"),
+             ("assistant", "I can offer a $200 certificate. Send it?"), ("user", "yes"),
+             ("call", "send_certificate", {"user_id": "gold_u", "amount": 200}, "ok"))
+    assert grade(P.compensation_allowed(db), ok).score == 1.0
+    unprompted = sim(("call", "get_reservation_details", {}, res("gold_u")), ("user", "My flight was cancelled"),
+                     ("assistant", "As a gesture, a $200 certificate?"), ("user", "yes"),
+                     ("call", "send_certificate", {"user_id": "gold_u", "amount": 200}, "ok"))
+    assert "unprompted" in grade(P.compensation_allowed(db), unprompted).reason
+    no_reason = sim(("call", "get_reservation_details", {}, res("gold_u", "HAT999")), ("user", "compensation please"),
+                    ("call", "send_certificate", {"user_id": "gold_u", "amount": 200}, "ok"))
+    assert "no cancelled or delayed" in grade(P.compensation_allowed(db), no_reason).reason
+    regular = sim(("call", "get_reservation_details", {}, res("reg_u")), ("user", "compensation please"),
+                  ("call", "send_certificate", {"user_id": "reg_u", "amount": 200}, "ok"))
+    assert "not eligible" in grade(P.compensation_allowed(db), regular).reason
+    wrong_amount = sim(("call", "get_reservation_details", {}, res("gold_u")), ("user", "compensation please"),
+                       ("call", "send_certificate", {"user_id": "gold_u", "amount": 500}, "ok"))
+    assert "allows [200]" in grade(P.compensation_allowed(db), wrong_amount).reason
+
+
 def test_user_sim_leak_is_non_gating():
     r = grade(P.user_sim_leak(), sim(("user", "If cancellation isn't possible, I should mention my insurance")))
     assert r.score == 0.0 and r.gating is False

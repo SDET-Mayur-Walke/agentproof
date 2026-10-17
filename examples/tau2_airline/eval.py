@@ -24,7 +24,8 @@ from agentproof import report as rpt             # noqa: E402
 from adapter import load                         # noqa: E402
 from policy_graders import all_graders           # noqa: E402
 
-PROCESS = ["confirmed_before_write", "cancel_eligible", "cancel_reason_asked", "no_tool_loop"]
+PROCESS = ["confirmed_before_write", "cancel_eligible", "cancel_reason_asked", "compensation_allowed",
+           "no_tool_loop"]
 
 
 def main() -> None:
